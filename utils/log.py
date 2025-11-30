@@ -9,8 +9,7 @@ def initialize_logger():
         level=0,
         diagnose=False,
         format="[<green>{time:YYYY-MM-DD HH:mm:ss}</green>]"
-               "[<lvl>{level}</lvl>]"
-               "[<cyan>{name}</cyan>]: {message}",
+               "[<cyan>{name}</cyan>/<lvl>{level}</lvl>]: {message}",
         filter=default_filter,
         colorize=True
     )

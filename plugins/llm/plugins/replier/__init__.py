@@ -30,23 +30,26 @@ class Replier:
         )
         self._context = ChatCompletionContext(max_context_count)
 
-    async def chat(self, nick_name: str, msg: str, current_activity: dict):
-        start = time.perf_counter()
-
+    def push_context(self, nick_name: str, context: str):
         self._context.push(
             ChatCompletionUserMessageParam(
                 role="user",
-                content=f"{nick_name}: {msg}"
+                content=f"{nick_name}: {context}"
             )
         )
+
+    async def chat(self, nick_name: str, message: str, current_activity: dict):
+        start = time.perf_counter()
 
         action = current_activity.get("action", "")
         reason = current_activity.get("reason", "")
         events = current_activity.get("random_events", [])
         events_str = ", ".join(events) if events else "无"
         time_slot = current_activity.get("time_slot", "")
+        is_holiday = current_activity.get("is_holiday", False)
         next_activity = current_activity.get("next", {})
         activity_str = (f"当前活动: {action}, 时间段: {time_slot}, 理由: {reason}, "
+                        f"休息日: {'True' if is_holiday else 'False'}"
                         f"随机事件: {events_str}, 下个日程: {json.dumps(next_activity)}")
 
         system_messages = [
@@ -60,7 +63,7 @@ class Replier:
             ),
             ChatCompletionSystemMessageParam(
                 role="system",
-                content=f"当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                content=f"当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S, %A')}"
             )
         ]
 
@@ -82,7 +85,7 @@ class Replier:
         cost = time.perf_counter() - start
         logger.opt(colors=True).info(
             f"[<g>{cost:.1f}s</g> | <m>{response.usage.total_tokens}({response.usage.prompt_tokens_details.cached_tokens} Cached)</m> Tokens] "
-            f"{nick_name} {msg} -> Reply: <b><y>{reply_text}</y></b>"
+            f"{nick_name} {message} -> Reply: <b><y>{reply_text}</y></b>"
         )
 
         return reply_text

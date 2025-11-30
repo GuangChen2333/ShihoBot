@@ -17,6 +17,7 @@ from ..common.context import StringContext
 
 config = get_plugin_config(Config)
 
+
 class Continuitier:
     def __init__(self, max_context_count: int = 7):
         self._client = AsyncOpenAI(
@@ -25,10 +26,12 @@ class Continuitier:
         )
         self._context = StringContext(max_context_count)
 
+    def push_context(self, context: str):
+        self._context.push(context)
+
     async def judge(self, msg: str) -> bool:
         start = time.perf_counter()
 
-        self._context.push(msg)
         response = await self._client.responses.create(
             model=config.LLM_CONTINUITIER_MODEL,
             instructions=config.LLM_CONTINUITIER_PROMPT,

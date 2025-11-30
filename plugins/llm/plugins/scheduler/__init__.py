@@ -1,5 +1,4 @@
 import json
-import random
 import time
 from datetime import datetime, date
 from typing import Dict, Any
@@ -17,6 +16,8 @@ __plugin_meta__ = PluginMetadata(
     usage="",
     config=Config,
 )
+
+from ...utils.helper import chance
 
 config = get_plugin_config(Config)
 CACHE_FILE = store.get_plugin_data_file("schedule.json")
@@ -93,6 +94,7 @@ class Scheduler:
             "random_events": [],
             "time_slot": resolved["slot"],
             "next": remaining_slots[0] if len(remaining_slots) > 0 else None,
+            "is_holiday": config.is_holiday()
         })
 
         cost = time.perf_counter() - start
@@ -102,7 +104,7 @@ class Scheduler:
         )
         return result_dict
 
-    async def generate(self) -> Dict[str, Any]:
+    async def get(self) -> Dict[str, Any]:
         today_str = date.today().isoformat()
         resolved = self._resolve_task()
         slot_key = resolved["slot"]
@@ -114,7 +116,7 @@ class Scheduler:
             logger.info("Generating schedule...")
             result = await self._call_llm(resolved)
             for ev in config.random_events:
-                if random.random() < ev.probability:
+                if chance(ev.probability):
                     result["random_events"].append(ev.event)
             self.cache[today_str][slot_key] = result
             self._save_cache()
