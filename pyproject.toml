@@ -1,0 +1,28 @@
+[project]
+name = "shihobot"
+version = "0.1.0"
+description = ""
+authors = [
+    { name = "Guang_Chen_", email = "guangchen23333@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.13, <4.0"
+dependencies = [
+    "openai (>=2.8.0,<3.0.0)",
+    "nonebot2[fastapi] (>=2.4.4,<3.0.0)",
+    "nonebot-adapter-onebot (>=2.4.6,<3.0.0)",
+    "tortoise-orm (>=0.25.1,<0.26.0)",
+    "aiosqlite (>=0.21.0,<0.22.0)",
+    "nonebot-plugin-apscheduler>=0.5.0",
+    "nonebot-plugin-localstore>=0.7.4"
+]
+
+[tool.poetry]
+package-mode = false
+
+[tool.nonebot.plugins]
+nonebot-plugin-apscheduler = ["nonebot_plugin_apscheduler"]
+nonebot-plugin-localstore = ["nonebot_plugin_localstore"]
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
