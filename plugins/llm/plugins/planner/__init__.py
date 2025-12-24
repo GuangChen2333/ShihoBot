@@ -28,8 +28,8 @@ class Planner:
         )
         self._context = StringContext(max_context_count)
 
-    def push_context(self, context: str):
-        self._context.push(context)
+    def push_context(self, nick_name: str, context: str):
+        self._context.push(f"{nick_name}: {context}")
 
     async def judge(self, msg: str) -> bool:
         start = time_module.perf_counter()
@@ -50,14 +50,18 @@ class Planner:
                         content=self._context.build()
                     )
                 ],
-                temperature=0.15
+                temperature=0.05
             )
             result = response.choices[0].message.content == "true"
         cost = time_module.perf_counter() - start
 
-        logger.opt(colors=True).info(
-            f"[<g>{cost:.1f}s</g> | <m>{response.usage.total_tokens if response else 0}</m> Tokens] "
-            f"{msg} -> Reply: <b><y>{response.choices[0].message.content}</y></b>"
-        )
+        if response:
+            logger.opt(colors=True).info(
+                f"[<g>{cost:.1f}s</g> | <m>{response.usage.total_tokens}({response.usage.prompt_tokens_details.cached_tokens} Cached)</m> Tokens] "
+                f"{msg} -> Reply: <b><y>{response.choices[0].message.content}</y></b>"
+            )
+        else:
+            logger.opt(colors=True).info(
+                f"[<g>{cost:.1f}s</g>] {msg} -> Reply: <b><y>{response.choices[0].message.content}</y></b>")
 
         return result

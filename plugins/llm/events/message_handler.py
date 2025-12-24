@@ -1,3 +1,7 @@
+import asyncio
+import random
+import time
+
 import nonebot
 from nonebot import get_plugin_config
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, Bot
@@ -36,13 +40,12 @@ def setup():
 
     @message_matcher.handle()
     async def on_group_msg_event(event: GroupMessageEvent, bot: Bot):
+        start_time = time.monotonic()
+
         message = build_message(event.message)
         nick_name = event.sender.card if event.sender.card else event.sender.nickname
 
-        llm.push_context(
-            nick_name=nick_name,
-            context=message,
-        )
+        llm.push_context(nick_name=nick_name, context=message)
 
         content = await llm.chat(
             nick_name=nick_name,
@@ -53,4 +56,21 @@ def setup():
         if not content:
             return
 
-        await bot.send(event, content, reply_message=True)
+        parts = content.split("\n")
+        index = 0
+
+        for part in parts:
+            if not part.strip():
+                index += 1
+                continue
+
+            length = len(part)
+            char_per_sec = random.uniform(6, 10)
+            delay = max(0.5, min(length / char_per_sec, 5))
+            await asyncio.sleep(delay)
+
+            total_time = time.monotonic() - start_time
+            use_reply = (index == 0 and total_time > 6)
+
+            await bot.send(event, part, reply_message=use_reply)
+            index += 1

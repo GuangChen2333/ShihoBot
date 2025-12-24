@@ -31,12 +31,7 @@ class Replier:
         self._context = ChatCompletionContext(max_context_count)
 
     def push_context(self, nick_name: str, context: str):
-        self._context.push(
-            ChatCompletionUserMessageParam(
-                role="user",
-                content=f"{nick_name}: {context}"
-            )
-        )
+        self._context.push_user(nick_name, context)
 
     async def chat(self, nick_name: str, message: str, current_activity: dict):
         start = time.perf_counter()
@@ -75,12 +70,7 @@ class Replier:
 
         reply_text = response.choices[0].message.content
 
-        self._context.push(
-            ChatCompletionAssistantMessageParam(
-                role="assistant",
-                content=reply_text
-            )
-        )
+        self._context.push_assistant(reply_text)
 
         cost = time.perf_counter() - start
         logger.opt(colors=True).info(
