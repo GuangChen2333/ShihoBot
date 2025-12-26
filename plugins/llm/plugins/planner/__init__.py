@@ -34,7 +34,7 @@ class Planner:
     async def judge(self, msg: str) -> bool:
         start = time_module.perf_counter()
         now = datetime.now().time()
-        if now >= time(23, 0) or now <= time(6, 30):
+        if config.LLM_PLANNER_TOO_LATE_DISABLE and (now >= time(23, 0) or now <= time(6, 30)):
             result = False
             response = None
         else:
@@ -62,6 +62,6 @@ class Planner:
             )
         else:
             logger.opt(colors=True).info(
-                f"[<g>{cost:.1f}s</g>] {msg} -> Reply: <b><y>{response.choices[0].message.content}</y></b>")
+                f"[<g>{cost:.1f}s</g>] {msg} -> Reply skipped by rule window")
 
         return result

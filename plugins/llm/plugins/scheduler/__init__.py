@@ -18,6 +18,7 @@ __plugin_meta__ = PluginMetadata(
 )
 
 from ...utils.helper import chance
+from ..common.holiday import build_special_note
 
 config = get_plugin_config(Config)
 CACHE_FILE = store.get_plugin_data_file("schedule.json")
@@ -67,13 +68,18 @@ class Scheduler:
                     "task": slot.tasks
                 })
 
+        today = date.today()
+        special_note = build_special_note(today)
+
         user_data: Dict[str, Any] = {
             "mode": resolved["mode"],
             "time": now.strftime("%H:%M"),
+            "date": now.strftime("%Y-%m-%d"),
             "current_task": resolved.get("task", ""),
             "current_slot": resolved.get("slot", ""),
             "remaining_slots": remaining_slots,
-            "is_holiday": config.is_holiday()
+            "is_holiday": config.is_holiday(),
+            "special_today": special_note
         }
 
         start = time.perf_counter()
@@ -108,19 +114,34 @@ class Scheduler:
         today_str = date.today().isoformat()
         resolved = self._resolve_task()
         slot_key = resolved["slot"]
+        now_ts = time.time()
+        refresh_seconds = max(config.LLM_SCHEDULER_REFRESH_MINUTES, 1) * 60
 
         if today_str not in self.cache:
             self.cache[today_str] = {}
 
-        if slot_key not in self.cache[today_str]:
+        cached_entry = self.cache[today_str].get(slot_key)
+        generated_at = 0.0
+        if isinstance(cached_entry, dict):
+            generated_at = cached_entry.get("generated_at", 0.0)
+
+        need_refresh = (
+            cached_entry is None
+            or (now_ts - generated_at) >= refresh_seconds
+        )
+
+        if need_refresh:
             logger.info("Generating schedule...")
             result = await self._call_llm(resolved)
             for ev in config.random_events:
                 if chance(ev.probability):
                     result["random_events"].append(ev.event)
-            self.cache[today_str][slot_key] = result
+            self.cache[today_str][slot_key] = {
+                "generated_at": now_ts,
+                "data": result
+            }
             self._save_cache()
             return result
-        else:
-            cached = self.cache[today_str][slot_key].copy()
-            return cached
+
+        cached_data = cached_entry.get("data", cached_entry)
+        return cached_data.copy()

@@ -12,6 +12,7 @@ from nonebot.rule import to_me
 from ..LLM import LLM
 from ..config import Config
 from ..utils.helper import contains_text, build_message
+from ..plugins.common.message_tracker import MessageTracker
 
 
 def setup():
@@ -37,6 +38,7 @@ def setup():
     )
 
     llm = LLM()
+    tracker = MessageTracker()
 
     @message_matcher.handle()
     async def on_group_msg_event(event: GroupMessageEvent, bot: Bot):
@@ -44,6 +46,9 @@ def setup():
 
         message = build_message(event.message)
         nick_name = event.sender.card if event.sender.card else event.sender.nickname
+
+        # 记录当前消息序号，用于之后判断是否有其他消息插队
+        current_msg_counter = await tracker.mark_new()
 
         llm.push_context(nick_name=nick_name, context=message)
 
@@ -59,6 +64,11 @@ def setup():
         parts = content.split("\n")
         index = 0
 
+        # 检查是否有其他消息在等待回复期间插入，或延迟超过阈值
+        diff = await tracker.diff_since(current_msg_counter)
+        has_insert = diff >= 4
+        should_reply_flag = has_insert or (time.monotonic() - start_time > 7)
+
         for part in parts:
             if not part.strip():
                 index += 1
@@ -69,8 +79,7 @@ def setup():
             delay = max(0.5, min(length / char_per_sec, 5))
             await asyncio.sleep(delay)
 
-            total_time = time.monotonic() - start_time
-            use_reply = (index == 0 and total_time > 6)
+            use_reply = (index == 0 and should_reply_flag)
 
             await bot.send(event, part, reply_message=use_reply)
             index += 1

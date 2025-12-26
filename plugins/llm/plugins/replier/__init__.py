@@ -1,6 +1,7 @@
+import asyncio
 import json
 import time
-from datetime import datetime
+from datetime import datetime, date
 
 from nonebot import get_plugin_config, logger
 from nonebot.plugin import PluginMetadata
@@ -20,10 +21,12 @@ __plugin_meta__ = PluginMetadata(
 config = get_plugin_config(Config)
 
 from ..common.context import ChatCompletionContext
+from ..common.holiday import build_special_note
 
 
 class Replier:
     def __init__(self, max_context_count: int = 20):
+        self._lock = asyncio.Lock()
         self._client = AsyncOpenAI(
             base_url=config.LLM_REPLIER_BASE_URL,
             api_key=config.LLM_REPLIER_API_KEY
@@ -34,48 +37,52 @@ class Replier:
         self._context.push_user(nick_name, context)
 
     async def chat(self, nick_name: str, message: str, current_activity: dict):
-        start = time.perf_counter()
+        async with self._lock:
+            start = time.perf_counter()
 
-        action = current_activity.get("action", "")
-        reason = current_activity.get("reason", "")
-        events = current_activity.get("random_events", [])
-        events_str = ", ".join(events) if events else "无"
-        time_slot = current_activity.get("time_slot", "")
-        is_holiday = current_activity.get("is_holiday", False)
-        next_activity = current_activity.get("next", {})
-        activity_str = (f"当前活动: {action}, 时间段: {time_slot}, 理由: {reason}, "
-                        f"休息日: {'True' if is_holiday else 'False'}"
-                        f"随机事件: {events_str}, 下个日程: {json.dumps(next_activity)}")
+            action = current_activity.get("action", "")
+            reason = current_activity.get("reason", "")
+            events = current_activity.get("random_events", [])
+            events_str = ", ".join(events) if events else "无"
+            time_slot = current_activity.get("time_slot", "")
+            is_holiday = current_activity.get("is_holiday", False)
+            next_activity = current_activity.get("next", {})
+            activity_str = (f"当前活动: {action}, 时间段: {time_slot}, 理由: {reason}, "
+                            f"休息日: {'True' if is_holiday else 'False'}"
+                            f"随机事件: {events_str}, 下个日程: {json.dumps(next_activity)}")
 
-        system_messages = [
-            ChatCompletionSystemMessageParam(
-                role="system",
-                content=config.LLM_REPLIER_PROMPT
-            ),
-            ChatCompletionSystemMessageParam(
-                role="system",
-                content=activity_str
-            ),
-            ChatCompletionSystemMessageParam(
-                role="system",
-                content=f"当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S, %A')}"
+            today = date.today()
+            special_note = build_special_note(today)
+
+            system_messages = [
+                ChatCompletionSystemMessageParam(
+                    role="system",
+                    content=config.LLM_REPLIER_PROMPT
+                ),
+                ChatCompletionSystemMessageParam(
+                    role="system",
+                    content=activity_str
+                ),
+                ChatCompletionSystemMessageParam(
+                    role="system",
+                    content=f"当前时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S, %A')} | {special_note}"
+                )
+            ]
+
+            response = await self._client.chat.completions.create(
+                model=config.LLM_REPLIER_MODEL,
+                messages=system_messages + self._context.messages,
+                temperature=0.8,
             )
-        ]
 
-        response = await self._client.chat.completions.create(
-            model=config.LLM_REPLIER_MODEL,
-            messages=system_messages + self._context.messages,
-            temperature=0.8,
-        )
+            reply_text = response.choices[0].message.content
 
-        reply_text = response.choices[0].message.content
+            self._context.push_assistant(reply_text)
 
-        self._context.push_assistant(reply_text)
+            cost = time.perf_counter() - start
+            logger.opt(colors=True).info(
+                f"[<g>{cost:.1f}s</g> | <m>{response.usage.total_tokens}({response.usage.prompt_tokens_details.cached_tokens} Cached)</m> Tokens] "
+                f"{nick_name} {message} -> Reply: <b><y>{reply_text}</y></b>"
+            )
 
-        cost = time.perf_counter() - start
-        logger.opt(colors=True).info(
-            f"[<g>{cost:.1f}s</g> | <m>{response.usage.total_tokens}({response.usage.prompt_tokens_details.cached_tokens} Cached)</m> Tokens] "
-            f"{nick_name} {message} -> Reply: <b><y>{reply_text}</y></b>"
-        )
-
-        return reply_text
+            return reply_text

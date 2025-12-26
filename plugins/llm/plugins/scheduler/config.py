@@ -1,7 +1,8 @@
-from datetime import datetime
+from datetime import datetime, date
 from typing import List
 
 from pydantic import BaseModel
+from ..common.holiday import holiday_notes
 
 
 class SchedulerTimeSlot(BaseModel):
@@ -17,6 +18,7 @@ class Config(BaseModel):
     LLM_SCHEDULER_BASE_URL: str
     LLM_SCHEDULER_API_KEY: str
     LLM_SCHEDULER_MODEL: str = "gpt-5-mini"
+    LLM_SCHEDULER_REFRESH_MINUTES: int = 20
     LLM_SCHEDULER_PERSONALITY: str = """
 你现在扮演日野森志步。请根据当前时间合理安排活动
 
@@ -34,6 +36,8 @@ Leo/need 乐队的贝斯手，喜欢拉面、书法和可爱的小动物
 
 行为要求：
 根据当前时间合理安排活动
+一天中练习需要适量：不要把所有时间都用来练习，连续练习后应安排休息、吃饭、上课/作业、和朋友/姐姐互动、发呆放空等日常
+如果上一时间段已经在练习，本时间段优先安排非练习类的事
 action 字段仅输出当前时间段的活动，后续的日程表仅供参考
 reason 字段填写这么做的心里想法
 注意今天是否是休息日
@@ -42,8 +46,8 @@ reason 字段填写这么做的心里想法
 
 输出格式必须严格遵循如下JSON格式：
 {
-  "action": "12:35 的午休时间，我坐在教室靠窗的角落，轻轻闭眼小憩，手边摊着书法练习本和笔，旁边是一只可爱的小动物毛绒玩具。心里想着今晚的贝斯练习和下一节课要复习的内容。",
-  "reason": "利用午休让眼睛和手臂短暂放松、恢复状态，方便稍后继续排练与练字。"
+  "action": "12:35 午休 我在教室靠窗的位置发呆吃便当，偶尔翻翻书法练习本，手机放着乐队的录音但不练习",
+  "reason": "上午已经上课和练习过，午休想先放松手和耳朵，下午再看情况安排"
 }
 """
 
@@ -56,8 +60,10 @@ reason 字段填写这么做的心里想法
     def is_holiday(self) -> bool:
         if self.FORCE_HOLIDAY:
             return True
-        now = datetime.now()
-        return now.weekday() >= 5
+        today = datetime.now()
+        # 周末 或 节日（含生日等特殊日）判为休息日
+        has_holiday_flag = len(holiday_notes(date(today.year, today.month, today.day))) > 0
+        return today.weekday() >= 5 or has_holiday_flag
 
     @property
     def time_slots(self) -> List[SchedulerTimeSlot]:
