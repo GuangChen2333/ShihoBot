@@ -13,7 +13,7 @@ class LLM:
     def push_context(self, nick_name: str, context: str) -> None:
         self._replier.push_context(nick_name, context)
         self._planner.push_context(nick_name, context)
-
+    
     async def chat(self, nick_name: str, message: str, force_reply: bool = False) -> str | None:
         activity = await self._scheduler.get()
 
