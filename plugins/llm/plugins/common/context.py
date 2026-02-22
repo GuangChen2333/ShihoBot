@@ -40,6 +40,17 @@ class ChatCompletionContext:
 
         return self._messages.copy()
 
+    def snapshot_messages(self) -> List[ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam]:
+        messages = self._messages.copy()
+        if len(self._user_msgs) > 0:
+            messages.append(
+                ChatCompletionUserMessageParam(
+                    role="user",
+                    content="\n".join(self._user_msgs),
+                )
+            )
+        return messages
+
     def _push(self, completion: ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam) -> None:
         self._messages.append(completion)
         if len(self._messages) > self._max_context_count:

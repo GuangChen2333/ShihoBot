@@ -50,12 +50,13 @@ def setup():
         # 记录当前消息序号，用于之后判断是否有其他消息插队
         current_msg_counter = await tracker.mark_new()
 
-        llm.push_context(nick_name=nick_name, context=message)
+        context_snapshot = llm.push_context(nick_name=nick_name, context=message)
 
         content = await llm.chat(
             nick_name=nick_name,
             message=message,
-            force_reply=event.to_me
+            force_reply=event.to_me,
+            context_snapshot=context_snapshot
         )
 
         if not content:

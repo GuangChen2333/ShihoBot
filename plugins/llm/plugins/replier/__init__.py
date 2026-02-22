@@ -2,6 +2,7 @@ import asyncio
 import json
 import time
 from datetime import datetime, date
+from typing import List
 
 from nonebot import get_plugin_config, logger
 from nonebot.plugin import PluginMetadata
@@ -36,7 +37,16 @@ class Replier:
     def push_context(self, nick_name: str, context: str):
         self._context.push_user(nick_name, context)
 
-    async def chat(self, nick_name: str, message: str, current_activity: dict):
+    def snapshot_context(self) -> List[ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam]:
+        return self._context.snapshot_messages()
+
+    async def chat(
+        self,
+        nick_name: str,
+        message: str,
+        current_activity: dict,
+        context_snapshot: List[ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam] | None = None
+    ):
         async with self._lock:
             start = time.perf_counter()
 
@@ -71,7 +81,7 @@ class Replier:
 
             response = await self._client.chat.completions.create(
                 model=config.LLM_REPLIER_MODEL,
-                messages=system_messages + self._context.messages,
+                messages=system_messages + (context_snapshot if context_snapshot is not None else self._context.messages),
                 temperature=0.8,
             )
 
