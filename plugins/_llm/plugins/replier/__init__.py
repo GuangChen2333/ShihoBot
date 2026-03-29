@@ -83,6 +83,7 @@ class Replier:
                 model=config.LLM_REPLIER_MODEL,
                 messages=system_messages + (context_snapshot if context_snapshot is not None else self._context.messages),
                 temperature=0.8,
+                max_tokens=5000
             )
 
             reply_text = response.choices[0].message.content

@@ -24,7 +24,7 @@ class Planner:
     def __init__(self, max_context_count: int = 5):
         self._client = AsyncOpenAI(
             base_url=config.LLM_PLANNER_BASE_URL,
-            api_key=config.LLM_PLANNER_API_KEY,
+            api_key=config.LLM_PLANNER_API_KEY
         )
         self._context = StringContext(max_context_count)
 

@@ -7,7 +7,7 @@ from nonebot.plugin import PluginMetadata
 from .config import Config
 
 __plugin_meta__ = PluginMetadata(
-    name="llm",
+    name="_llm",
     description="",
     usage="",
     config=Config,

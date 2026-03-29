@@ -11,7 +11,7 @@ from nonebot.rule import to_me
 
 from ..LLM import LLM
 from ..config import Config
-from ..utils.helper import contains_text, build_message
+from ..utils.helper import contains_text, build_message, get_images
 from ..plugins.common.message_tracker import MessageTracker
 
 
@@ -45,6 +45,8 @@ def setup():
         start_time = time.monotonic()
 
         message = build_message(event.message)
+        imgs = get_images(event.message)
+
         nick_name = event.sender.card if event.sender.card else event.sender.nickname
 
         # 记录当前消息序号，用于之后判断是否有其他消息插队

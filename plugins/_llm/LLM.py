@@ -1,7 +1,7 @@
-from plugins.llm.plugins.continuitier import Continuitier
-from plugins.llm.plugins.planner import Planner
-from plugins.llm.plugins.replier import Replier
-from plugins.llm.plugins.scheduler import Scheduler
+from plugins._llm.plugins.continuitier import Continuitier
+from plugins._llm.plugins.planner import Planner
+from plugins._llm.plugins.replier import Replier
+from plugins._llm.plugins.scheduler import Scheduler
 
 
 class LLM:
