@@ -38,22 +38,3 @@ async def on_command(bot: Bot, event: GroupMessageEvent):
     group_id = event.group_id
     user_id = event.user_id
     await mute_user(bot, user_id, group_id, 30)
-
-# async def is_bilibili(event: GroupMessageEvent):
-#     for msg in event.message:
-#         if msg.type == "text":
-#             content: str = msg.data['text']
-#             return 'bilibili' in content.lower() or 'b23' in content.lower()
-#         elif msg.type == "json":
-#             data: dict = json.loads(msg.data['data'])
-#             return data.get("meta", {}).get("detail_1", {}).get("appid") == "1109937557"
-#     return False
-#
-#
-# message_matcher = on_message(
-#     rule=is_bilibili
-# )
-#
-# @message_matcher.handle()
-# async def on_group_message(bot: Bot, event: GroupMessageEvent):
-#     await mute_user(bot, 3106123652, event.group_id, 60)
