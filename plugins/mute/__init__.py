@@ -1,9 +1,12 @@
+import random
+
 from nonebot import get_plugin_config, logger
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, Bot
 from nonebot.plugin import PluginMetadata
 from nonebot.plugin.on import on_command
 from nonebot.rule import is_type
 
+from utils.helper import minutes_to_seconds, chance
 from .config import Config
 
 __plugin_meta__ = PluginMetadata(
@@ -37,4 +40,9 @@ async def mute_user(bot: Bot, user_id: int, group_id: int, duration: int):
 async def on_command(bot: Bot, event: GroupMessageEvent):
     group_id = event.group_id
     user_id = event.user_id
-    await mute_user(bot, user_id, group_id, 30)
+    if chance(0.85):
+        duration = minutes_to_seconds(random.randint(1, 5))
+    else:
+        duration = minutes_to_seconds(random.randint(6, 10))
+
+    await mute_user(bot, user_id, group_id, minutes_to_seconds(duration))
