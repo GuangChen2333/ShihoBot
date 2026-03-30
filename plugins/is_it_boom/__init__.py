@@ -17,7 +17,7 @@ __plugin_meta__ = PluginMetadata(
 )
 
 config = get_plugin_config(Config)
-COOLDOWN_SECONDS = 30
+COOLDOWN_SECONDS = 300
 _last_called_at = 0.0
 
 command_matcher = on_command(
@@ -59,7 +59,7 @@ async def is_it_boom(event: GroupMessageEvent, bot: Bot):
         for service in services
     ]
     lines.append(
-        f"Untitled Sekai Viewer: {'✅ Online' if untitled_response.status_code == 200 else '❌ Offline'}"
+        f"Untitled Live2D Viewer: {'✅ Online' if untitled_response.status_code == 200 else '❌ Offline'}"
     )
     status_text = "\n".join(lines)
 
