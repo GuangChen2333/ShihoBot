@@ -45,4 +45,4 @@ async def on_command(bot: Bot, event: GroupMessageEvent):
     else:
         duration = minutes_to_seconds(random.randint(6, 10))
 
-    await mute_user(bot, user_id, group_id, minutes_to_seconds(duration))
+    await mute_user(bot, user_id, group_id, duration)
