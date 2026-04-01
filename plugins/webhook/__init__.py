@@ -1,6 +1,5 @@
 from nonebot import get_driver, get_plugin_config, logger
 from nonebot.adapters.onebot.v11 import Bot
-from nonebot.compat import model_dump
 from nonebot.exception import ActionFailed
 from nonebot.plugin import PluginMetadata
 from pydantic import BaseModel
@@ -46,7 +45,7 @@ async def webhook_send(payload: WebhookPayload):
             return {"ok": False, "message": "unsupported bot type"}
 
         result = await bot.send_group_msg(group_id=group_id, message=payload.data)
-        return {"ok": True, "group_id": group_id, "result": model_dump(result)}
+        return {"ok": True, "group_id": group_id, "result": result}
     except ActionFailed as e:
         logger.exception("Webhook send failed")
         return {"ok": False, "message": str(e)}
