@@ -50,9 +50,9 @@ approve_cmd = on_command(
 async def handle_request(_: Bot, event: GroupMessageEvent, args: Message = CommandArg()):
     name = args.extract_plain_text().strip()
     if not name:
-        await request_cmd.finish("Usage: /request <New Name>")
+        await request_cmd.finish("Usage: /request <New Name>", reply_message=True)
     if len(name) > 10:
-        await request_cmd.finish("名称不能超过10个字符")
+        await request_cmd.finish("名称不能超过10个字符", reply_message=True)
 
     queue = load_queue()
     queue.append({
@@ -65,7 +65,7 @@ async def handle_request(_: Bot, event: GroupMessageEvent, args: Message = Comma
     len([e for e in queue if e.get("approved")]) + \
     len([e for e in queue if not e.get("approved")])
     await request_cmd.finish(
-        f"等待管理员 /approve"
+        f"等待管理员 /approve", reply_message=True
     )
 
 
@@ -79,7 +79,7 @@ async def handle_approve(_: Bot, event: GroupMessageEvent):
         None,
     )
     if not pending:
-        await approve_cmd.finish("当前没有待审批的改名请求")
+        await approve_cmd.finish("当前没有待审批的改名请求", reply_message=True)
 
     pending["approved"] = True
     save_queue(queue)
@@ -88,7 +88,8 @@ async def handle_approve(_: Bot, event: GroupMessageEvent):
     )
     await approve_cmd.finish(
         f"已批准: {config.GROUP_NAME_PREFIX} {pending['name']}\n"
-        f"排在第 {position} 位。"
+        f"排在第 {position} 位。",
+        reply_message=True,
     )
 
 
