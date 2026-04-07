@@ -54,19 +54,28 @@ async def handle_request(_: Bot, event: GroupMessageEvent, args: Message = Comma
     if len(name) > 10:
         await request_cmd.finish("名称不能超过10个字符", reply_message=True)
 
+    is_admin = event.sender.role in ("admin", "owner")
     queue = load_queue()
     queue.append({
         "group_id": str(event.group_id),
         "name": name,
         "requested_by": event.user_id,
-        "approved": False,
+        "approved": is_admin,
     })
     save_queue(queue)
-    len([e for e in queue if e.get("approved")]) + \
-    len([e for e in queue if not e.get("approved")])
-    await request_cmd.finish(
-        f"等待管理员 /approve", reply_message=True
-    )
+
+    if is_admin:
+        position = next(
+            i + 1 for i, e in enumerate(queue) if e is queue[-1]
+        )
+        await request_cmd.finish(
+            f"排在第 {position} 位。",
+            reply_message=True,
+        )
+    else:
+        await request_cmd.finish(
+            f"等待管理员 /approve", reply_message=True
+        )
 
 
 @approve_cmd.handle()
