@@ -1,5 +1,6 @@
 import json
 
+import emoji
 from nonebot import get_plugin_config, logger, require
 from nonebot.adapters.onebot.v11 import GroupMessageEvent, Bot, Message
 from nonebot.adapters.onebot.v11.permission import GROUP_ADMIN, GROUP_OWNER
@@ -18,7 +19,7 @@ from .config import Config
 __plugin_meta__ = PluginMetadata(
     name="group_name",
     description="群名修改请求与审批",
-    usage="/request <name> 提交改名请求(<=10字符)\n/approve 管理员审批",
+    usage="/request <name> 提交改名请求(<=10字符)\n/approve 管理员审批\n/list-names 查看队列",
     config=Config,
 )
 
@@ -38,12 +39,20 @@ def save_queue(queue: list[dict]) -> None:
     )
 
 
+def format_group_name(name: str) -> str:
+    prefix = config.GROUP_NAME_PREFIX
+    if emoji.is_emoji(name[0]):
+        return f"{prefix} {name}"
+    return f"{prefix} | {name}"
+
+
 request_cmd = on_command("request", rule=is_type(GroupMessageEvent))
 approve_cmd = on_command(
     "approve",
     rule=is_type(GroupMessageEvent),
     permission=GROUP_ADMIN | GROUP_OWNER,
 )
+list_names_cmd = on_command("list-names", rule=is_type(GroupMessageEvent))
 
 
 @request_cmd.handle()
@@ -115,10 +124,23 @@ async def handle_approve(_: Bot, event: GroupMessageEvent):
         i + 1 for i, e in enumerate(queue) if e is pending
     )
     await approve_cmd.finish(
-        f"已批准: {config.GROUP_NAME_PREFIX} {pending['name']}\n"
+        f"已批准: {format_group_name(pending['name'])}\n"
         f"排在第 {position} 位。",
         reply_message=True,
     )
+
+
+@list_names_cmd.handle()
+async def handle_list_names(_: Bot, event: GroupMessageEvent):
+    queue = load_queue()
+    group_id = str(event.group_id)
+    approved = [e for e in queue if e["group_id"] == group_id and e.get("approved")]
+    if not approved:
+        await list_names_cmd.finish("当前没有已批准的改名请求", reply_message=True)
+    lines = [
+        f"{i + 1}. {format_group_name(e['name'])}" for i, e in enumerate(approved)
+    ]
+    await list_names_cmd.finish("\n".join(lines), reply_message=True)
 
 
 @scheduler.scheduled_job("cron", hour=0, minute=0)
@@ -134,7 +156,7 @@ async def apply_group_names():
         return
 
     bot: Bot = get_bot()  # type: ignore
-    group_name = f"{config.GROUP_NAME_PREFIX} {first['name']}"
+    group_name = format_group_name(first["name"])
     try:
         await bot.set_group_name(
             group_id=int(first["group_id"]), group_name=group_name
