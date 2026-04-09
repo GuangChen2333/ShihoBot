@@ -137,9 +137,12 @@ async def handle_list_names(_: Bot, event: GroupMessageEvent):
     approved = [e for e in queue if e["group_id"] == group_id and e.get("approved")]
     if not approved:
         await list_names_cmd.finish("当前没有已批准的改名请求", reply_message=True)
+    shown = approved[:5]
     lines = [
-        f"{i + 1}. {format_group_name(e['name'])}" for i, e in enumerate(approved)
+        f"{i + 1}. {format_group_name(e['name'])}" for i, e in enumerate(shown)
     ]
+    if len(approved) > 5:
+        lines.append(f"... 还有 {len(approved) - 5} 条")
     await list_names_cmd.finish("\n".join(lines), reply_message=True)
 
 
