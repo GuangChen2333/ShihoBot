@@ -73,9 +73,13 @@ async def handle_request(_: Bot, event: GroupMessageEvent, args: Message = Comma
             reply_message=True,
         )
     else:
-        await request_cmd.finish(
+        result = await request_cmd.send(
             f"等待管理员 /approve", reply_message=True
         )
+        queue[-1]["bot_reply_id"] = result["message_id"]
+        queue[-1]["request_msg_id"] = event.message_id
+        save_queue(queue)
+        await request_cmd.finish()
 
 
 @approve_cmd.handle()
@@ -83,12 +87,27 @@ async def handle_approve(_: Bot, event: GroupMessageEvent):
     queue = load_queue()
     group_id = str(event.group_id)
 
+    # 必须引用 bot 的"等待管理员"回复或原始 /request 消息来批准
+    if not event.reply:
+        await approve_cmd.finish(
+            "请引用要批准的改名请求消息来使用 /approve", reply_message=True
+        )
+
+    reply_id = event.reply.message_id
     pending = next(
-        (e for e in queue if e["group_id"] == group_id and not e.get("approved")),
+        (
+            e
+            for e in queue
+            if e["group_id"] == group_id
+            and not e.get("approved")
+            and reply_id in (e.get("bot_reply_id"), e.get("request_msg_id"))
+        ),
         None,
     )
     if not pending:
-        await approve_cmd.finish("当前没有待审批的改名请求", reply_message=True)
+        await approve_cmd.finish(
+            "未找到对应的待审批请求，请确认引用了正确的消息", reply_message=True
+        )
 
     pending["approved"] = True
     save_queue(queue)
