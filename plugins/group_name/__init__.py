@@ -120,8 +120,9 @@ async def handle_approve(_: Bot, event: GroupMessageEvent):
 
     pending["approved"] = True
     save_queue(queue)
+    approved = [e for e in queue if e["group_id"] == group_id and e.get("approved")]
     position = next(
-        i + 1 for i, e in enumerate(queue) if e is pending
+        i + 1 for i, e in enumerate(approved) if e is pending
     )
     await approve_cmd.finish(
         f"已批准: {format_group_name(pending['name'])}\n"
