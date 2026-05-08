@@ -15,12 +15,13 @@ from .config import Config
 __plugin_meta__ = PluginMetadata(
     name="mute",
     description="群禁言相关命令",
-    usage="/mute_me 随机禁言自己\n/mvote @用户 <分钟> 发起 1 分钟禁言投票",
+    usage="/mute_me 随机禁言自己\n/mvote @用户 [分钟] 发起 1 分钟禁言投票",
     config=Config,
 )
 
 config = get_plugin_config(Config)
 
+DEFAULT_MVOTE_DURATION_MINUTES = 1
 VOTE_DURATION_SECONDS = 60
 
 
@@ -86,12 +87,43 @@ def count_vote(vote: MuteVote) -> tuple[int, int]:
     agree = 0
     deny = 0
     for choice in vote.votes.values():
-        weight = 2 if choice.role in ("admin", "owner") else 1
+        weight = 3 if choice.role in ("admin", "owner") else 1
         if choice.vote == "agree":
             agree += weight
         else:
             deny += weight
     return agree, deny
+
+
+def is_group_admin(event: GroupMessageEvent) -> bool:
+    return event.sender.role in ("admin", "owner")
+
+
+def is_admin_role(role: str | None) -> bool:
+    return role in ("admin", "owner")
+
+
+def format_role(role: str | None) -> str:
+    if role == "owner":
+        return "群主"
+    if role == "admin":
+        return "管理员"
+    return "群成员"
+
+
+async def get_group_member_role(bot: Bot, group_id: int, user_id: int) -> str | None:
+    try:
+        info = await bot.call_api(
+            "get_group_member_info",
+            group_id=group_id,
+            user_id=user_id,
+            no_cache=True,
+        )
+    except Exception as e:
+        logger.warning(f"Get group member role failed: group={group_id}, user={user_id}, error={e}")
+        return None
+
+    return info.get("role")
 
 
 async def settle_vote(bot: Bot, message_id: int):
@@ -103,6 +135,15 @@ async def settle_vote(bot: Bot, message_id: int):
     vote.closed = True
     agree, deny = count_vote(vote)
     if agree > deny:
+        target_role = await get_group_member_role(bot, vote.group_id, vote.target_id)
+        if is_admin_role(target_role):
+            await bot.call_api(
+                "send_group_msg",
+                group_id=vote.group_id,
+                message=f"投票结束：目标是{format_role(target_role)}，不能禁言 {vote.target_id}。",
+            )
+            return
+
         await mute_user(
             bot,
             vote.target_id,
@@ -112,13 +153,13 @@ async def settle_vote(bot: Bot, message_id: int):
         await bot.call_api(
             "send_group_msg",
             group_id=vote.group_id,
-            message=f"投票结束：agree {agree} > deny {deny}，已禁言 {vote.target_id} {vote.duration_minutes} 分钟。",
+            message=f"投票结束：赞同 {agree} 票 > 反对 {deny} 票，已禁言 {vote.target_id} {vote.duration_minutes} 分钟。",
         )
     else:
         await bot.call_api(
             "send_group_msg",
             group_id=vote.group_id,
-            message=f"投票结束：agree {agree}，deny {deny}，未禁言 {vote.target_id}。",
+            message=f"投票结束：赞同 {agree} 票，反对 {deny} 票，未禁言 {vote.target_id}。",
         )
 
 
@@ -140,26 +181,51 @@ async def on_mvote(
     event: GroupMessageEvent,
     args: Message = CommandArg(),
 ):
+    target_id = None
+    duration_minutes = None
     try:
         target_id, duration_minutes = parse_mvote_args(args)
     except ValueError:
-        await mvote_matcher.finish("Usage: /mvote @用户 <分钟>", reply_message=True)
+        await mvote_matcher.finish("Usage: /mvote @用户 [分钟]", reply_message=True)
+        return
 
-    if target_id is None or duration_minutes is None or duration_minutes <= 0:
-        await mvote_matcher.finish("Usage: /mvote @用户 <分钟>", reply_message=True)
+    if target_id is None:
+        await mvote_matcher.finish("Usage: /mvote @用户 [分钟]", reply_message=True)
+        return
+
+    if duration_minutes is not None and duration_minutes <= 0:
+        await mvote_matcher.finish("Usage: /mvote @用户 [分钟]", reply_message=True)
+        return
+
+    target_role = await get_group_member_role(bot, event.group_id, target_id)
+    if is_admin_role(target_role):
+        await mvote_matcher.finish(
+            f"目标是{format_role(target_role)}，不能发起禁言投票",
+            reply_message=True,
+        )
+
+    if not is_group_admin(event):
+        final_duration_minutes = DEFAULT_MVOTE_DURATION_MINUTES
+    elif duration_minutes is None:
+        final_duration_minutes = DEFAULT_MVOTE_DURATION_MINUTES
+    else:
+        final_duration_minutes = duration_minutes
 
     result = await mvote_matcher.send(
-        f"禁言投票开始：目标 {target_id}，时长 {duration_minutes} 分钟。\n"
-        f"请在 {VOTE_DURATION_SECONDS // 60} 分钟内引用本消息发送 /agree 或 /deny。\n"
-        "管理员票权重为 2，普通成员为 1。",
-        reply_message=True,
+        f"禁言投票开始：\n"
+        f"目标 {target_id}，时长 {final_duration_minutes} 分钟。\n"
+        f"请在 {VOTE_DURATION_SECONDS // 60} 分钟内引用本消息发送 /agree 或 /deny。\n",
+        reply_message=True
     )
+
     message_id = result["message_id"]
-    mute_votes[message_id] = MuteVote(
+    vote = MuteVote(
         group_id=event.group_id,
         target_id=target_id,
-        duration_minutes=duration_minutes,
+        duration_minutes=final_duration_minutes,
     )
+    vote.votes[event.user_id] = VoteChoice(vote="agree", role=event.sender.role)
+    mute_votes[message_id] = vote
     asyncio.create_task(settle_vote(bot, message_id))
     await mvote_matcher.finish()
 
@@ -184,7 +250,7 @@ async def on_agree(event: GroupMessageEvent):
 
     agree, deny = result
     await agree_matcher.finish(
-        f"已记录 /agree。当前票数：agree {agree}，deny {deny}",
+        f"已记录 【赞同】。当前票数：赞同 {agree} 票，反对 {deny} 票",
         reply_message=True,
     )
 
@@ -197,6 +263,6 @@ async def on_deny(event: GroupMessageEvent):
 
     agree, deny = result
     await deny_matcher.finish(
-        f"已记录 /deny。当前票数：agree {agree}，deny {deny}",
+        f"已记录 【反对】。当前票数：赞同 {agree} 票，反对 {deny} 票",
         reply_message=True,
     )
