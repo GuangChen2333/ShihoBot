@@ -219,13 +219,11 @@ async def on_mvote(
     )
 
     message_id = result["message_id"]
-    vote = MuteVote(
+    mute_votes[message_id] = MuteVote(
         group_id=event.group_id,
         target_id=target_id,
         duration_minutes=final_duration_minutes,
     )
-    vote.votes[event.user_id] = VoteChoice(vote="agree", role=event.sender.role)
-    mute_votes[message_id] = vote
     asyncio.create_task(settle_vote(bot, message_id))
     await mvote_matcher.finish()
 
